@@ -1,5 +1,6 @@
 venv/
 webcam_env/
 dataset/
+leapGestRecog/
 __pycache__/
 *.pyc
