@@ -1,5 +1,7 @@
 import os
+os.environ["PORT"] = "10000"
 os.environ["TF_CPP_MIN_LOG_LEVEL"] = "2"
+
 import streamlit as st
 import tensorflow as tf
 import numpy as np
@@ -12,14 +14,19 @@ import av
 def load_model():
     return tf.keras.models.load_model("model/gesture_model.keras")
 
-model = load_model()
-# 🔥 IMPORTANT: manually define class names (NO dataset dependency)
+model = None
+try:
+    model = load_model()
+except Exception as e:
+    st.error(f"Model loading failed: {e}")
+
+# ---------------- CLASS NAMES ----------------
 class_names = [
     "down", "fist", "fist_moved", "Index", "okay",
     "palm", "palm_moved", "peace", "rock", "stop"
 ]
 
-# ---------------- STREAMLIT UI ----------------
+# ---------------- UI ----------------
 st.set_page_config(page_title="Hand Gesture Recognition", layout="centered")
 
 st.title("✋ Hand Gesture Recognition")
@@ -34,7 +41,7 @@ if mode == "📷 Image Upload":
 
     uploaded_file = st.file_uploader("Upload an Image", type=["jpg", "png", "jpeg"])
 
-    if uploaded_file:
+    if uploaded_file and model:
         image = Image.open(uploaded_file).convert("RGB")
         image = image.resize((64, 64))
 
@@ -43,7 +50,7 @@ if mode == "📷 Image Upload":
         img_array = np.array(image) / 255.0
         img_array = np.expand_dims(img_array, axis=0)
 
-        prediction = model.predict(img_array)
+        prediction = model(img_array, training=False).numpy()
         confidence = float(np.max(prediction))
         predicted_class = class_names[np.argmax(prediction)]
 
@@ -53,7 +60,7 @@ if mode == "📷 Image Upload":
             st.success(f"Prediction: {predicted_class} ({confidence:.2f})")
 
 # =========================================================
-# 📹 WEBCAM MODE (REAL-TIME)
+# 📹 WEBCAM MODE
 # =========================================================
 else:
     from streamlit_webrtc import webrtc_streamer, VideoTransformerBase
@@ -64,21 +71,20 @@ else:
         def transform(self, frame):
             img = frame.to_ndarray(format="bgr24")
 
-            # Resize for prediction
             img_resized = cv2.resize(img, (64, 64))
             img_array = img_resized / 255.0
             img_array = np.expand_dims(img_array, axis=0)
 
-            prediction = model.predict(img_array)
-            confidence = float(np.max(prediction))
-            predicted_class = class_names[np.argmax(prediction)]
+            if model:
+                prediction = model(img_array, training=False).numpy()
+                confidence = float(np.max(prediction))
+                predicted_class = class_names[np.argmax(prediction)]
 
-            # Show only if confident
-            if confidence > 0.75:
-                text = f"{predicted_class} ({confidence:.2f})"
-                cv2.putText(img, text, (20, 50),
-                            cv2.FONT_HERSHEY_SIMPLEX, 1,
-                            (0, 255, 0), 2)
+                if confidence > 0.75:
+                    text = f"{predicted_class} ({confidence:.2f})"
+                    cv2.putText(img, text, (20, 50),
+                                cv2.FONT_HERSHEY_SIMPLEX, 1,
+                                (0, 255, 0), 2)
 
             return img
 
