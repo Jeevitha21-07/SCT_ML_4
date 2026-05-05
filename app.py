@@ -1,3 +1,5 @@
+import os
+os.environ["TF_CPP_MIN_LOG_LEVEL"] = "2"
 import streamlit as st
 import tensorflow as tf
 import numpy as np
@@ -6,11 +8,14 @@ from PIL import Image
 import av
 
 # ---------------- LOAD MODEL ----------------
-model = tf.keras.models.load_model("model/gesture_model.keras")
+@st.cache_resource
+def load_model():
+    return tf.keras.models.load_model("model/gesture_model.keras")
 
+model = load_model()
 # 🔥 IMPORTANT: manually define class names (NO dataset dependency)
 class_names = [
-    "down", "fist", "fist_moved", "l", "okay",
+    "down", "fist", "fist_moved", "Index", "okay",
     "palm", "palm_moved", "peace", "rock", "stop"
 ]
 
