@@ -1,8 +1,11 @@
 import os
-os.environ["PORT"] = "10000"
 os.environ["TF_CPP_MIN_LOG_LEVEL"] = "2"
 
 import streamlit as st
+
+# ✅ MUST be first Streamlit command
+st.set_page_config(page_title="Hand Gesture Recognition", layout="centered")
+
 import tensorflow as tf
 import numpy as np
 import cv2
@@ -14,21 +17,15 @@ import av
 def load_model():
     return tf.keras.models.load_model("model/gesture_model.keras")
 
-model = None
-try:
-    model = load_model()
-except Exception as e:
-    st.error(f"Model loading failed: {e}")
+model = load_model()
 
-# ---------------- CLASS NAMES ----------------
+# ✅ No dataset dependency
 class_names = [
     "down", "fist", "fist_moved", "Index", "okay",
     "palm", "palm_moved", "peace", "rock", "stop"
 ]
 
 # ---------------- UI ----------------
-st.set_page_config(page_title="Hand Gesture Recognition", layout="centered")
-
 st.title("✋ Hand Gesture Recognition")
 st.write("Choose Image Upload or Webcam Detection")
 
@@ -41,16 +38,16 @@ if mode == "📷 Image Upload":
 
     uploaded_file = st.file_uploader("Upload an Image", type=["jpg", "png", "jpeg"])
 
-    if uploaded_file and model:
+    if uploaded_file:
         image = Image.open(uploaded_file).convert("RGB")
-        image = image.resize((64, 64))
+        image_resized = image.resize((64, 64))
 
         st.image(image, caption="Uploaded Image", width=300)
 
-        img_array = np.array(image) / 255.0
+        img_array = np.array(image_resized) / 255.0
         img_array = np.expand_dims(img_array, axis=0)
 
-        prediction = model(img_array, training=False).numpy()
+        prediction = model.predict(img_array)
         confidence = float(np.max(prediction))
         predicted_class = class_names[np.argmax(prediction)]
 
@@ -71,20 +68,21 @@ else:
         def transform(self, frame):
             img = frame.to_ndarray(format="bgr24")
 
+            # Resize for model
             img_resized = cv2.resize(img, (64, 64))
             img_array = img_resized / 255.0
             img_array = np.expand_dims(img_array, axis=0)
 
-            if model:
-                prediction = model(img_array, training=False).numpy()
-                confidence = float(np.max(prediction))
-                predicted_class = class_names[np.argmax(prediction)]
+            prediction = model.predict(img_array)
+            confidence = float(np.max(prediction))
+            predicted_class = class_names[np.argmax(prediction)]
 
-                if confidence > 0.75:
-                    text = f"{predicted_class} ({confidence:.2f})"
-                    cv2.putText(img, text, (20, 50),
-                                cv2.FONT_HERSHEY_SIMPLEX, 1,
-                                (0, 255, 0), 2)
+            # Show prediction only if confident
+            if confidence > 0.75:
+                text = f"{predicted_class} ({confidence:.2f})"
+                cv2.putText(img, text, (20, 50),
+                            cv2.FONT_HERSHEY_SIMPLEX,
+                            1, (0, 255, 0), 2)
 
             return img
 
